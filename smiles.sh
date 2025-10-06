@@ -96,12 +96,20 @@ find / -type f -executable -xdev 2>/dev/null | while read -r f; do
     if [[ "$f" == "$e"* ]]; then skip=1; break; fi
   done
   if [[ $skip -eq 0 ]]; then
-    # avoid noise: skip files owned by root:root (most packaged root-owned executables)
+    # avoid noise: skip files owned by root (or group root) and common package/library paths
     owner=$(stat -c "%U" "$f" 2>/dev/null || echo "")
     group=$(stat -c "%G" "$f" 2>/dev/null || echo "")
-    if [[ "$owner" == "root" && "$group" == "root" ]]; then
+    # treat numeric "0" the same as "root"
+    if [[ "$owner" == "root" || "$owner" == "0" || "$group" == "root" || "$group" == "0" ]]; then
       continue
     fi
+
+    # extra path-based exclusions for noisy package directories (some systems expose many files here)
+    case "$f" in
+      /usr/lib/python*|/usr/lib/.*/python*|/usr/lib/python*/dist-packages/*|/var/lib/dpkg/*|/usr/share/*|/var/cache/*)
+        continue
+        ;;
+    esac
 
     # only flag items that are likely to be unusual: files not under the excludes
     # and that are executable by the current user
